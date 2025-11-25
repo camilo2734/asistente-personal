@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Calendar, CheckSquare, BrainCircuit, Book, MessageSquare, Plus, LayoutGrid, Zap, GraduationCap, ListFilter, XCircle } from 'lucide-react';
 import { WEEKLY_SCHEDULE, SUBJECTS } from './constants';
@@ -6,6 +7,7 @@ import { parseUserInput, getSmartSuggestion } from './services/geminiService';
 import InputBar from './components/InputBar';
 import TaskCard from './components/TaskCard';
 import SummaryWidget from './components/SummaryWidget';
+import WeeklySummaryPanel from './components/WeeklySummaryPanel';
 import WeeklyCalendar from './components/WeeklyCalendar';
 import MentoringPanel from './components/MentoringPanel';
 import PersonalTasksPanel from './components/PersonalTasksPanel';
@@ -219,7 +221,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:px-6 space-y-8 mt-4">
+      <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:px-6 space-y-6 mt-4">
         
         {/* Top Section: Summary & Quick Stats */}
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -230,9 +232,12 @@ const App: React.FC = () => {
           />
         </section>
 
+        {/* Weekly Summary Panel */}
+        <WeeklySummaryPanel />
+
         {/* AI Response Message Area */}
         {lastMessage && (
-          <div className="max-w-3xl mx-auto bg-white/80 backdrop-blur-sm border border-violet-100 text-violet-800 p-4 rounded-2xl flex items-start gap-3 animate-in zoom-in-95 duration-300 shadow-lg shadow-violet-100/50">
+          <div className="max-w-3xl mx-auto bg-white/80 backdrop-blur-sm border border-violet-100 text-violet-800 p-4 rounded-2xl flex items-start gap-3 animate-in zoom-in-95 duration-300 shadow-lg shadow-violet-100/50 mb-6">
             <div className="bg-violet-100 p-2 rounded-full shrink-0">
               <MessageSquare className="w-5 h-5 text-violet-600" />
             </div>
