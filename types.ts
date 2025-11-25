@@ -1,3 +1,4 @@
+
 export enum TaskType {
   ACADEMIC = 'ACADEMICO',
   PERSONAL = 'PERSONAL',
@@ -51,7 +52,7 @@ export interface SmartSuggestion {
 }
 
 export interface InputPayload {
-  type: 'TASK' | 'MEETING' | 'QUESTION';
+  type: 'TASK' | 'MEETING' | 'QUESTION' | 'MENTORING_ENTRY';
   data: {
     title?: string; // For description in Task/Meeting
     subject?: string;
@@ -59,5 +60,33 @@ export interface InputPayload {
     date?: string;
     time?: string;
     question?: string;
+    mentoringType?: 'TOPIC' | 'DATE' | 'WORKSHOP'; // Specific for mentoring
   };
+}
+
+export interface MentoringTopic {
+  id: string;
+  title: string;
+  status: 'PREPARED' | 'IN_PROGRESS' | 'COMPLETED';
+  students?: string;
+  notes?: string;
+}
+
+export type PersonalCategory = 'Hogar' | 'Salud' | 'Finanzas' | 'Compras' | 'Otros';
+
+export interface PersonalTask {
+  id: string;
+  title: string;
+  category: PersonalCategory;
+  priority: Priority; // Reusing Priority enum or string
+  completed: boolean;
+  date?: string;
+}
+
+export interface HistoryItem {
+  id: string;
+  title: string;
+  category: 'ACADEMIC' | 'MENTORING' | 'PERSONAL';
+  completedAt: string; // ISO Date
+  details?: string;
 }

@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Loader2, Plus, Calendar, MessageCircle, CheckCircle2, X, ChevronDown, Clock, AlertCircle } from 'lucide-react';
+import { Send, Loader2, Plus, Calendar, MessageCircle, CheckCircle2, X, ChevronDown, FlaskConical, AlertCircle } from 'lucide-react';
 import { SUBJECTS } from '../constants';
 import { Priority, InputPayload } from '../types';
 
@@ -8,7 +9,8 @@ interface InputBarProps {
   isLoading: boolean;
 }
 
-type InputMode = 'IDLE' | 'SELECT_TYPE' | 'FORM_TASK' | 'FORM_MEETING' | 'FORM_QUESTION';
+type InputMode = 'IDLE' | 'SELECT_TYPE' | 'FORM_TASK' | 'FORM_MEETING' | 'FORM_QUESTION' | 'FORM_MENTORING';
+type MentoringSubType = 'TOPIC' | 'DATE' | 'WORKSHOP';
 
 const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading }) => {
   const [mode, setMode] = useState<InputMode>('IDLE');
@@ -21,6 +23,9 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading }) => {
   const [selectedPriority, setSelectedPriority] = useState<Priority>(Priority.MEDIUM);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  
+  // Mentoring Specific States
+  const [mentoringSubType, setMentoringSubType] = useState<MentoringSubType>('TOPIC');
 
   // Reset form when mode changes
   useEffect(() => {
@@ -31,6 +36,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading }) => {
       setSelectedPriority(Priority.MEDIUM);
       setDate('');
       setTime('');
+      setMentoringSubType('TOPIC');
     } else {
       setIsExpanded(true);
     }
@@ -81,15 +87,20 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading }) => {
           question: description
         }
       });
+    } else if (mode === 'FORM_MENTORING') {
+      if (!description || !date || !time) return;
+      onSend({
+        type: 'MENTORING_ENTRY',
+        data: {
+          mentoringType: mentoringSubType,
+          title: description, // The description acts as the content (Topic Name, Workshop details, etc.)
+          date: date,
+          time: time
+        }
+      });
     }
 
     setMode('IDLE');
-  };
-
-  const getPriorityColor = (p: Priority) => {
-    if (p === Priority.HIGH) return 'bg-rose-100 text-rose-700 border-rose-200';
-    if (p === Priority.MEDIUM) return 'bg-amber-100 text-amber-700 border-amber-200';
-    return 'bg-emerald-100 text-emerald-700 border-emerald-200';
   };
 
   return (
@@ -121,13 +132,13 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading }) => {
                 <button onClick={() => setMode('IDLE')} className="p-1 hover:bg-slate-100 rounded-full text-slate-400"><X className="w-5 h-5"/></button>
               </div>
               
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <button 
                   onClick={() => setMode('FORM_TASK')}
                   className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-100 transition-all hover:shadow-md"
                 >
                   <div className="bg-indigo-100 p-3 rounded-full text-indigo-600"><CheckCircle2 className="w-6 h-6"/></div>
-                  <span className="font-semibold">Tarea</span>
+                  <span className="font-semibold text-sm">Tarea</span>
                 </button>
                 
                 <button 
@@ -135,7 +146,15 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading }) => {
                   className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-slate-50 hover:bg-pink-50 hover:text-pink-600 border border-slate-100 transition-all hover:shadow-md"
                 >
                   <div className="bg-pink-100 p-3 rounded-full text-pink-600"><Calendar className="w-6 h-6"/></div>
-                  <span className="font-semibold">Reunión</span>
+                  <span className="font-semibold text-sm">Reunión</span>
+                </button>
+
+                <button 
+                  onClick={() => setMode('FORM_MENTORING')}
+                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-slate-50 hover:bg-orange-50 hover:text-orange-600 border border-slate-100 transition-all hover:shadow-md"
+                >
+                  <div className="bg-orange-100 p-3 rounded-full text-orange-600"><FlaskConical className="w-6 h-6"/></div>
+                  <span className="font-semibold text-sm">Monitoría</span>
                 </button>
                 
                 <button 
@@ -143,7 +162,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading }) => {
                   className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-slate-50 hover:bg-sky-50 hover:text-sky-600 border border-slate-100 transition-all hover:shadow-md"
                 >
                   <div className="bg-sky-100 p-3 rounded-full text-sky-600"><MessageCircle className="w-6 h-6"/></div>
-                  <span className="font-semibold">Pregunta</span>
+                  <span className="font-semibold text-sm">Pregunta</span>
                 </button>
               </div>
             </div>
@@ -161,6 +180,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading }) => {
                         {mode === 'FORM_TASK' && 'Nueva Tarea'}
                         {mode === 'FORM_MEETING' && 'Nueva Reunión'}
                         {mode === 'FORM_QUESTION' && 'Consultar al Asistente'}
+                        {mode === 'FORM_MENTORING' && 'Monitoría de Estadística'}
                     </h3>
                 </div>
                 <button type="button" onClick={() => setMode('IDLE')} className="p-1 hover:bg-slate-100 rounded-full text-slate-400"><X className="w-5 h-5"/></button>
@@ -272,6 +292,71 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading }) => {
                   </div>
               )}
 
+               {/* MENTORING FORM FIELDS (NEW) */}
+               {mode === 'FORM_MENTORING' && (
+                  <div className="space-y-3">
+                      
+                      {/* Sub-type Selector */}
+                      <div>
+                          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Tipo de Registro</label>
+                          <select 
+                            value={mentoringSubType}
+                            onChange={(e) => setMentoringSubType(e.target.value as MentoringSubType)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                          >
+                              <option value="TOPIC">Tema de monitoría</option>
+                              <option value="DATE">Fecha de monitoría</option>
+                              <option value="WORKSHOP">Taller de monitoría</option>
+                          </select>
+                      </div>
+
+                      {/* Date & Time (Mandatory) */}
+                      <div className="flex gap-4">
+                          <div className="flex-1">
+                              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Fecha</label>
+                              <input 
+                                type="date" 
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                              />
+                          </div>
+                          <div className="flex-1">
+                              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Hora</label>
+                              <input 
+                                type="time" 
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                                value={time}
+                                onChange={(e) => setTime(e.target.value)}
+                              />
+                          </div>
+                      </div>
+
+                      {/* Description / Content */}
+                      <div>
+                       <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                           {mentoringSubType === 'TOPIC' && 'Tema Visto'}
+                           {mentoringSubType === 'DATE' && 'Notas (Opcional)'}
+                           {mentoringSubType === 'WORKSHOP' && 'Descripción del Taller'}
+                       </label>
+                       <textarea 
+                          autoFocus
+                          rows={2}
+                          placeholder={
+                              mentoringSubType === 'TOPIC' ? "Ej: Distribución Normal..." : 
+                              mentoringSubType === 'WORKSHOP' ? "Ej: Ejercicios del capítulo 4..." :
+                              "Nota sobre la sesión..."
+                          }
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-base font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 resize-none"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                       />
+                   </div>
+                  </div>
+              )}
+
               {/* QUESTION FORM FIELDS */}
               {mode === 'FORM_QUESTION' && (
                   <div>
@@ -293,17 +378,19 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading }) => {
               {/* SUBMIT BUTTON */}
               <button
                 type="submit"
-                disabled={isLoading || !description}
+                disabled={isLoading || !description || (mode === 'FORM_MENTORING' && (!date || !time))}
                 className={`w-full py-3 rounded-xl font-bold text-white transition-all shadow-lg flex items-center justify-center gap-2
                     ${mode === 'FORM_TASK' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : ''}
                     ${mode === 'FORM_MEETING' ? 'bg-pink-600 hover:bg-pink-700 shadow-pink-200' : ''}
+                    ${mode === 'FORM_MENTORING' ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-200' : ''}
                     ${mode === 'FORM_QUESTION' ? 'bg-sky-600 hover:bg-sky-700 shadow-sky-200' : ''}
-                    ${isLoading || !description ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'}
+                    ${isLoading || !description || (mode === 'FORM_MENTORING' && (!date || !time)) ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'}
                 `}
               >
                 {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 {mode === 'FORM_TASK' && 'Guardar Tarea'}
                 {mode === 'FORM_MEETING' && 'Agendar Reunión'}
+                {mode === 'FORM_MENTORING' && 'Registrar Monitoría'}
                 {mode === 'FORM_QUESTION' && 'Enviar Pregunta'}
               </button>
             </form>

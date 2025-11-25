@@ -1,54 +1,30 @@
 import React, { useState } from 'react';
-import { Home, Heart, ShoppingBag, Wallet, CheckCircle2, Plus, X, Tag, MoreHorizontal, Calendar, Activity, Utensils } from 'lucide-react';
+import { Home, Heart, ShoppingBag, Wallet, CheckCircle2, Plus, Tag, Activity, Calendar } from 'lucide-react';
+import { PersonalTask, PersonalCategory, Priority } from '../types';
 
-type Category = 'Hogar' | 'Salud' | 'Finanzas' | 'Compras' | 'Otros';
-type Priority = 'Alta' | 'Media' | 'Baja';
-
-interface PersonalTask {
-  id: string;
-  title: string;
-  category: Category;
-  priority: Priority;
-  completed: boolean;
-  date?: string;
+interface PersonalTasksPanelProps {
+  tasks: PersonalTask[];
+  onAdd: (title: string, category: PersonalCategory, priority: string) => void;
+  onComplete: (id: string) => void;
 }
 
-const PersonalTasksPanel: React.FC = () => {
-  const [tasks, setTasks] = useState<PersonalTask[]>([]);
-
+const PersonalTasksPanel: React.FC<PersonalTasksPanelProps> = ({ tasks, onAdd, onComplete }) => {
   const [isAdding, setIsAdding] = useState(false);
   
   // Form State
   const [newTitle, setNewTitle] = useState('');
-  const [newCategory, setNewCategory] = useState<Category>('Hogar');
-  const [newPriority, setNewPriority] = useState<Priority>('Media');
+  const [newCategory, setNewCategory] = useState<PersonalCategory>('Hogar');
+  const [newPriority, setNewPriority] = useState<Priority>(Priority.MEDIUM);
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
-    
-    setTasks([
-      {
-        id: Date.now().toString(),
-        title: newTitle,
-        category: newCategory,
-        priority: newPriority,
-        completed: false,
-        date: 'Hoy' // Default for quick add
-      },
-      ...tasks
-    ]);
-    
+    onAdd(newTitle, newCategory, newPriority);
     setNewTitle('');
     setIsAdding(false);
   };
 
-  // Función modificada: Elimina la tarea en lugar de marcarla como completada
-  const completeTask = (id: string) => {
-    setTasks(tasks.filter(t => t.id !== id));
-  };
-
-  const categories: Record<Category, { icon: any, color: string, bg: string }> = {
+  const categories: Record<PersonalCategory, { icon: any, color: string, bg: string }> = {
     'Hogar': { icon: Home, color: 'text-orange-600', bg: 'bg-orange-100' },
     'Salud': { icon: Activity, color: 'text-rose-600', bg: 'bg-rose-100' },
     'Finanzas': { icon: Wallet, color: 'text-emerald-600', bg: 'bg-emerald-100' },
@@ -57,9 +33,9 @@ const PersonalTasksPanel: React.FC = () => {
   };
 
   const priorityColors = {
-    'Alta': 'bg-rose-500',
-    'Media': 'bg-amber-400',
-    'Baja': 'bg-slate-300'
+    [Priority.HIGH]: 'bg-rose-500',
+    [Priority.MEDIUM]: 'bg-amber-400',
+    [Priority.LOW]: 'bg-slate-300'
   };
 
   return (
@@ -91,7 +67,7 @@ const PersonalTasksPanel: React.FC = () => {
 
         {/* Add Form */}
         {isAdding && (
-            <form onSubmit={handleAdd} className="mb-6 bg-slate-50/80 p-4 rounded-2xl border border-slate-100 animate-in fade-in slide-in-from-top-2">
+            <form onSubmit={handleAddSubmit} className="mb-6 bg-slate-50/80 p-4 rounded-2xl border border-slate-100 animate-in fade-in slide-in-from-top-2">
                 <input
                     autoFocus
                     type="text"
@@ -110,7 +86,7 @@ const PersonalTasksPanel: React.FC = () => {
                                 <button
                                     key={key}
                                     type="button"
-                                    onClick={() => setNewCategory(key as Category)}
+                                    onClick={() => setNewCategory(key as PersonalCategory)}
                                     className={`p-1.5 rounded-lg transition-all ${newCategory === key ? config.bg + ' ' + config.color + ' ring-2 ring-offset-1 ring-slate-100' : 'text-slate-400 hover:bg-white'}`}
                                     title={key}
                                 >
@@ -122,7 +98,7 @@ const PersonalTasksPanel: React.FC = () => {
                     
                     {/* Priority Selector */}
                     <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-200">
-                         {(['Baja', 'Media', 'Alta'] as Priority[]).map(p => (
+                         {([Priority.LOW, Priority.MEDIUM, Priority.HIGH]).map(p => (
                              <button
                                 key={p}
                                 type="button"
@@ -152,7 +128,7 @@ const PersonalTasksPanel: React.FC = () => {
                         className={`group flex items-start gap-3 p-3 rounded-2xl transition-all duration-200 border ${task.completed ? 'bg-slate-50/50 border-transparent opacity-60' : 'bg-white border-slate-100 hover:border-rose-100 hover:shadow-sm'}`}
                     >
                          <button 
-                            onClick={() => completeTask(task.id)}
+                            onClick={() => onComplete(task.id)}
                             className={`mt-0.5 shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${task.completed ? 'bg-slate-400 border-slate-400 text-white' : 'border-slate-300 text-transparent hover:border-rose-400 hover:bg-rose-50'}`}
                             title="Completar y eliminar"
                         >

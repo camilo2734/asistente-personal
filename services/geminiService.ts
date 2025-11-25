@@ -12,25 +12,50 @@ Universidad: ${USER_PROFILE.university}.
 Programa: ${USER_PROFILE.program}.
 Rol Adicional: ${USER_PROFILE.role}.
 
-Materias actuales: ${SUBJECTS.join(', ')}.
+TU COMPORTAMIENTO DEBE SER ESTRICTO Y BASADO EN HECHOS.
+NO INVENTES INFORMACIÓN, TEMAS NI FECHAS QUE NO HAYAN SIDO PROPORCIONADOS.
 
-Tus responsabilidades:
-1. Gestionar listas de tareas, clases y reuniones.
-2. Recordar su rol de Monitor de Estadística y sugerir espacios para ello.
-3. Detectar sobrecarga académica y sugerir descansos.
-4. Responder siempre de forma clara, ordenada y útil ("Dashbord style").
+--- REGLAS ESPECÍFICAS: SECCIÓN DE MONITORÍA DE ESTADÍSTICA ---
 
-IMPORTANTE:
-- Si el usuario agrega una tarea relacionada con una materia, asocia la materia correctamente.
-- Si menciona "monitoría", clasifícalo como MONITORIA.
-- Organiza por prioridad.
+El usuario podrá solicitar las siguientes acciones. Debes identificar la intención correctamente.
+
+1. REGISTRAR TEMA DE MONITORÍA:
+   - Acción: Detectar el tema exacto.
+   - Respuesta texto: "Tema visto: [Tema exacto]"
+   - Regla: Solo usar el tema que el usuario indique. No agregar contenidos no mencionados.
+
+2. REGISTRAR FECHA DE MONITORÍA:
+   - Acción: Detectar fecha y hora.
+   - Respuesta texto: "Fecha: [Fecha formateada]"
+   - Regla: No asumir fechas futuras. Si falta información, pídela.
+
+3. ELABORAR TALLER DE LA MONITORÍA:
+   - Acción: Generar ejercicios.
+   - Contenido: Ejercicios completos y resueltos adaptados a Estadística 1.
+   - Regla ABSOLUTA: Basarse ÚNICAMENTE en los temas que el usuario mencione en el prompt o temas explícitos de Estadística descriptiva/inferencial básica si se pide ayuda general, pero priorizando lo registrado. NO incluir contenidos avanzados no solicitados.
+
+--- GESTIÓN GENERAL ---
+- Si el usuario agrega una tarea, infiere fecha y prioridad.
+- Responde de forma clara y concisa.
 `;
 
-// Schema for parsing user input into a task
+// Schema for parsing user input
 const taskExtractionSchema: Schema = {
   type: Type.OBJECT,
   properties: {
-    intent: { type: Type.STRING, enum: ['ADD_TASK', 'QUERY', 'CHAT'], description: "The user's intention" },
+    intent: { 
+      type: Type.STRING, 
+      enum: ['ADD_TASK', 'QUERY', 'CHAT', 'ADD_MENTORING_TOPIC', 'GENERATE_WORKSHOP'], 
+      description: "The user's intention. Use ADD_MENTORING_TOPIC if they want to register a topic seen in class." 
+    },
+    mentoringData: {
+      type: Type.OBJECT,
+      properties: {
+        topic: { type: Type.STRING, description: "The specific statistics topic to add (e.g., 'Distribución Normal')" },
+        workshopContent: { type: Type.STRING, description: "If intent is GENERATE_WORKSHOP, put the full exercises text here." }
+      },
+      nullable: true
+    },
     taskDetails: {
       type: Type.OBJECT,
       properties: {
@@ -39,11 +64,11 @@ const taskExtractionSchema: Schema = {
         priority: { type: Type.STRING, enum: Object.values(Priority) },
         dueDate: { type: Type.STRING, description: "ISO Date string YYYY-MM-DD" },
         description: { type: Type.STRING },
-        subject: { type: Type.STRING, enum: [...SUBJECTS, 'Otro'], description: "The academic subject related to this task if applicable" }
+        subject: { type: Type.STRING, enum: [...SUBJECTS, 'Otro'] }
       },
       nullable: true
     },
-    responseMessage: { type: Type.STRING, description: "A friendly, efficient confirmation or response message to Camilo." }
+    responseMessage: { type: Type.STRING, description: "The strict text response requested (e.g., 'Tema visto: ...')" }
   },
   required: ['intent', 'responseMessage']
 };
@@ -58,9 +83,9 @@ export const parseUserInput = async (input: string): Promise<any> => {
     Hoy es: ${dayOfWeek}, ${today}.
     Input del usuario: "${input}"
     
-    Analiza si es una nueva tarea, una consulta de horario o simplemente charla.
-    Si es tarea, infiere fecha limite y prioridad basándote en el contexto (ej: "para mañana" es prioridad ALTA).
-    Si menciona una materia (${SUBJECTS.join(', ')}), asígnala al campo 'subject'.
+    Analiza la intención estrictamente.
+    Si pide "Registrar tema" o "Vimos tal tema" -> intent: ADD_MENTORING_TOPIC.
+    Si pide "Taller" o "Ejercicios" -> intent: GENERATE_WORKSHOP.
   `;
 
   try {
@@ -99,18 +124,13 @@ export const getSmartSuggestion = async (tasks: Task[]): Promise<any> => {
   const dayName = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayOfWeek];
   
   const pendingTasks = tasks.filter(t => !t.completed).map(t => `${t.title} (${t.priority})`).join(', ');
-  const todaysClasses = WEEKLY_SCHEDULE.filter(c => c.dayOfWeek === dayOfWeek).map(c => c.subject).join(', ');
 
   const prompt = `
     Hoy es ${dayName}.
     Usuario: Camilo Henriquez (${USER_PROFILE.role}).
-    Clases de hoy: ${todaysClasses || 'Ninguna'}.
     Tareas pendientes: ${pendingTasks || 'Ninguna'}.
     
     Genera una recomendación estratégica (máx 2 oraciones).
-    - Si tiene muchas tareas, prioriza.
-    - Si el día es ligero, sugiere adelantar trabajo de Monitoría.
-    - Si es fin de semana, sugiere descanso o repaso suave.
   `;
 
   try {

@@ -1,54 +1,49 @@
 
 import React from 'react';
-import { Trophy, CheckCircle2, Users, Heart, Star, TrendingUp, CalendarCheck, BookOpen, ArrowRight } from 'lucide-react';
+import { Trophy, CheckCircle2, Users, Heart, Star, TrendingUp, CalendarCheck, BookOpen, ArrowRight, AlertCircle } from 'lucide-react';
+import { HistoryItem } from '../types';
 
-const WeeklySummaryPanel: React.FC = () => {
-  // Mock Data para visualizar el diseño
-  const stats = {
-    academicCompleted: 14,
-    mentoringSessions: 2,
-    personalTasks: 6,
-    effectiveness: 92
+interface WeeklySummaryPanelProps {
+  history: HistoryItem[];
+}
+
+const WeeklySummaryPanel: React.FC<WeeklySummaryPanelProps> = ({ history }) => {
+  // Filter history for the last 7 days
+  const now = new Date();
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  
+  const recentHistory = history.filter(item => new Date(item.completedAt) > oneWeekAgo);
+
+  // Calculate Stats
+  const academicCompleted = recentHistory.filter(i => i.category === 'ACADEMIC').length;
+  const mentoringSessions = recentHistory.filter(i => i.category === 'MENTORING').length;
+  const personalTasks = recentHistory.filter(i => i.category === 'PERSONAL').length;
+  
+  // Simple "effectiveness" mock calculation based on activity (capped at 100)
+  const totalActivity = academicCompleted + mentoringSessions + personalTasks;
+  const effectiveness = totalActivity === 0 ? 0 : Math.min(100, 50 + (totalActivity * 5));
+
+  const getIconForCategory = (cat: string) => {
+      switch(cat) {
+          case 'ACADEMIC': return BookOpen;
+          case 'MENTORING': return Users;
+          case 'PERSONAL': return Heart;
+          default: return Star;
+      }
   };
 
-  const highlights = [
-    {
-      id: 1,
-      category: 'ACADEMIC',
-      title: 'Entrega Final: Simulación',
-      date: 'Viernes',
-      icon: BookOpen,
-      color: 'text-indigo-600',
-      bg: 'bg-indigo-50'
-    },
-    {
-      id: 2,
-      category: 'MENTORING',
-      title: 'Taller de Repaso: Parcial 2',
-      date: 'Jueves',
-      icon: Users,
-      color: 'text-orange-600',
-      bg: 'bg-orange-50'
-    },
-    {
-      id: 3,
-      category: 'PERSONAL',
-      title: 'Compra mensual y pagos',
-      date: 'Sábado',
-      icon: Heart,
-      color: 'text-rose-600',
-      bg: 'bg-rose-50'
-    },
-    {
-      id: 4,
-      category: 'ACADEMIC',
-      title: 'Quiz de Operaciones (Nota: 5.0)',
-      date: 'Martes',
-      icon: Star,
-      color: 'text-yellow-600',
-      bg: 'bg-yellow-50'
-    }
-  ];
+  const getStyleForCategory = (cat: string) => {
+      switch(cat) {
+          case 'ACADEMIC': return { color: 'text-indigo-600', bg: 'bg-indigo-50' };
+          case 'MENTORING': return { color: 'text-orange-600', bg: 'bg-orange-50' };
+          case 'PERSONAL': return { color: 'text-rose-600', bg: 'bg-rose-50' };
+          default: return { color: 'text-slate-600', bg: 'bg-slate-50' };
+      }
+  };
+
+  const formatDate = (iso: string) => {
+      return new Date(iso).toLocaleDateString('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <div className="relative rounded-3xl p-[1px] bg-gradient-to-r from-violet-200 via-indigo-200 to-blue-200 shadow-xl shadow-indigo-100/50 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -62,13 +57,17 @@ const WeeklySummaryPanel: React.FC = () => {
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-800 leading-none">Resumen Semana Pasada</h2>
-              <p className="text-sm text-slate-500 font-medium mt-1">20 Oct - 26 Oct</p>
+              <p className="text-sm text-slate-500 font-medium mt-1">
+                 Actividad reciente basada en tu historial real
+              </p>
             </div>
           </div>
-          <div className="hidden sm:flex items-center gap-2 text-xs font-bold text-violet-600 bg-violet-50 px-3 py-1.5 rounded-full border border-violet-100">
-            <TrendingUp className="w-4 h-4" />
-            <span>Excelente rendimiento</span>
-          </div>
+          {totalActivity > 0 && (
+            <div className="hidden sm:flex items-center gap-2 text-xs font-bold text-violet-600 bg-violet-50 px-3 py-1.5 rounded-full border border-violet-100">
+                <TrendingUp className="w-4 h-4" />
+                <span>Registro activo</span>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -83,10 +82,10 @@ const WeeklySummaryPanel: React.FC = () => {
                 </div>
                 <span className="text-xs font-bold text-slate-400">ACADÉMICO</span>
               </div>
-              <div className="text-3xl font-bold text-slate-800 mb-1">{stats.academicCompleted}</div>
+              <div className="text-3xl font-bold text-slate-800 mb-1">{academicCompleted}</div>
               <div className="text-xs text-slate-500">Tareas completadas</div>
               <div className="w-full bg-slate-200 h-1.5 rounded-full mt-3 overflow-hidden">
-                <div className="bg-indigo-500 h-full rounded-full w-[85%]"></div>
+                <div className="bg-indigo-500 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, academicCompleted * 10)}%` }}></div>
               </div>
             </div>
 
@@ -98,10 +97,10 @@ const WeeklySummaryPanel: React.FC = () => {
                 </div>
                 <span className="text-xs font-bold text-slate-400">MONITORÍA</span>
               </div>
-              <div className="text-3xl font-bold text-slate-800 mb-1">{stats.mentoringSessions}</div>
-              <div className="text-xs text-slate-500">Sesiones dictadas</div>
+              <div className="text-3xl font-bold text-slate-800 mb-1">{mentoringSessions}</div>
+              <div className="text-xs text-slate-500">Temas finalizados</div>
               <div className="w-full bg-slate-200 h-1.5 rounded-full mt-3 overflow-hidden">
-                <div className="bg-orange-500 h-full rounded-full w-[100%]"></div>
+                <div className="bg-orange-500 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, mentoringSessions * 20)}%` }}></div>
               </div>
             </div>
 
@@ -113,10 +112,10 @@ const WeeklySummaryPanel: React.FC = () => {
                 </div>
                 <span className="text-xs font-bold text-slate-400">PERSONAL</span>
               </div>
-              <div className="text-3xl font-bold text-slate-800 mb-1">{stats.personalTasks}</div>
+              <div className="text-3xl font-bold text-slate-800 mb-1">{personalTasks}</div>
               <div className="text-xs text-slate-500">Actividades listas</div>
               <div className="w-full bg-slate-200 h-1.5 rounded-full mt-3 overflow-hidden">
-                <div className="bg-rose-500 h-full rounded-full w-[60%]"></div>
+                <div className="bg-rose-500 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, personalTasks * 10)}%` }}></div>
               </div>
             </div>
 
@@ -128,10 +127,10 @@ const WeeklySummaryPanel: React.FC = () => {
                 </div>
                 <span className="text-xs font-bold text-slate-400">EFECTIVIDAD</span>
               </div>
-              <div className="text-3xl font-bold text-slate-800 mb-1">{stats.effectiveness}%</div>
-              <div className="text-xs text-slate-500">Cumplimiento total</div>
+              <div className="text-3xl font-bold text-slate-800 mb-1">{effectiveness}%</div>
+              <div className="text-xs text-slate-500">Nivel de actividad</div>
               <div className="w-full bg-slate-200 h-1.5 rounded-full mt-3 overflow-hidden">
-                <div className="bg-emerald-500 h-full rounded-full w-[92%]"></div>
+                <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: `${effectiveness}%` }}></div>
               </div>
             </div>
           </div>
@@ -139,26 +138,39 @@ const WeeklySummaryPanel: React.FC = () => {
           {/* Right Column: Highlights List */}
           <div className="bg-slate-50/50 rounded-2xl p-1 border border-slate-100 flex flex-col">
             <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Highlights de la Semana</h3>
+                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Últimos Logros</h3>
             </div>
             <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[220px] scrollbar-hide">
-              {highlights.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <div key={item.id} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
-                    <div className={`p-2 rounded-full shrink-0 ${item.bg} ${item.color}`}>
-                      <Icon className="w-4 h-4" />
+              {recentHistory.length > 0 ? (
+                recentHistory.slice(0, 8).map((item) => {
+                    const Icon = getIconForCategory(item.category);
+                    const style = getStyleForCategory(item.category);
+                    return (
+                    <div key={item.id} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                        <div className={`p-2 rounded-full shrink-0 ${style.bg} ${style.color}`}>
+                        <Icon className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-semibold text-slate-800 truncate">{item.title}</h4>
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                             <span className="capitalize">{formatDate(item.completedAt)}</span>
+                             {item.details && <span className="text-slate-300">•</span>}
+                             {item.details && <span className="truncate max-w-[100px]">{item.details}</span>}
+                        </div>
+                        </div>
+                        <div className="text-slate-300">
+                            <ArrowRight className="w-4 h-4" />
+                        </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-semibold text-slate-800 truncate">{item.title}</h4>
-                      <p className="text-xs text-slate-400">{item.date}</p>
-                    </div>
-                    <div className="text-slate-300">
-                        <ArrowRight className="w-4 h-4" />
-                    </div>
+                    );
+                })
+              ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                      <AlertCircle className="w-8 h-8 opacity-20 mb-2" />
+                      <p className="text-sm font-medium">No se registraron nuevas actividades esta semana.</p>
+                      <p className="text-xs opacity-70 mt-1">Completa tareas para verlas aquí.</p>
                   </div>
-                );
-              })}
+              )}
             </div>
           </div>
 

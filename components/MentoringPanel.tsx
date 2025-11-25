@@ -1,43 +1,23 @@
 import React, { useState } from 'react';
-import { GraduationCap, Users, Plus, ChevronRight, CheckCircle2, Clock, BookOpen, MoreHorizontal, FlaskConical } from 'lucide-react';
+import { Users, Plus, ChevronRight, Clock, BookOpen, FlaskConical } from 'lucide-react';
+import { MentoringTopic } from '../types';
 
-interface MentoringTopic {
-  id: string;
-  title: string;
-  status: 'PREPARED' | 'IN_PROGRESS' | 'COMPLETED';
-  students?: string;
-  notes?: string;
+interface MentoringPanelProps {
+  topics: MentoringTopic[];
+  onAdd: (title: string) => void;
+  onCycleStatus: (id: string) => void;
 }
 
-const MentoringPanel: React.FC = () => {
-  const [topics, setTopics] = useState<MentoringTopic[]>([]);
-
+const MentoringPanel: React.FC<MentoringPanelProps> = ({ topics, onAdd, onCycleStatus }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
-    setTopics([...topics, {
-      id: Date.now().toString(),
-      title: newTitle,
-      status: 'IN_PROGRESS',
-      students: 'Por asignar'
-    }]);
+    onAdd(newTitle);
     setNewTitle('');
     setIsAdding(false);
-  };
-
-  const cycleStatus = (id: string) => {
-    setTopics(topics.map(t => {
-      if (t.id !== id) return t;
-      const map: Record<string, 'PREPARED' | 'IN_PROGRESS' | 'COMPLETED'> = {
-        'PREPARED': 'IN_PROGRESS',
-        'IN_PROGRESS': 'COMPLETED',
-        'COMPLETED': 'PREPARED'
-      };
-      return { ...t, status: map[t.status] };
-    }));
   };
 
   const getStatusStyle = (s: string) => {
@@ -87,7 +67,7 @@ const MentoringPanel: React.FC = () => {
 
         {/* Add Form */}
         {isAdding && (
-            <form onSubmit={handleAdd} className="mb-4 animate-in fade-in slide-in-from-top-2">
+            <form onSubmit={handleAddSubmit} className="mb-4 animate-in fade-in slide-in-from-top-2">
                 <div className="flex gap-2">
                     <input
                         autoFocus
@@ -109,7 +89,7 @@ const MentoringPanel: React.FC = () => {
             {topics.map(topic => (
                 <div key={topic.id} className="group/item bg-slate-50 hover:bg-white border border-slate-100 hover:border-orange-100 rounded-2xl p-3 transition-all hover:shadow-md cursor-pointer select-none">
                     <div className="flex justify-between items-start gap-3">
-                        <div className="flex-1" onClick={() => cycleStatus(topic.id)}>
+                        <div className="flex-1" onClick={() => onCycleStatus(topic.id)}>
                              <div className="flex items-center gap-2 mb-1.5">
                                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${getStatusStyle(topic.status)}`}>
                                     {getStatusLabel(topic.status)}

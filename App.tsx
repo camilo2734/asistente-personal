@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, CheckSquare, BrainCircuit, Book, MessageSquare, Plus, LayoutGrid, Zap, GraduationCap, ListFilter, XCircle } from 'lucide-react';
 import { WEEKLY_SCHEDULE, SUBJECTS } from './constants';
-import { Task, SmartSuggestion, TaskType, Priority, InputPayload } from './types';
+import { Task, SmartSuggestion, TaskType, Priority, InputPayload, HistoryItem, MentoringTopic, PersonalTask, PersonalCategory } from './types';
 import { parseUserInput, getSmartSuggestion } from './services/geminiService';
 import InputBar from './components/InputBar';
 import TaskCard from './components/TaskCard';
@@ -16,9 +16,30 @@ import PersonalTasksPanel from './components/PersonalTasksPanel';
 const INITIAL_TASKS: Task[] = [];
 
 const App: React.FC = () => {
+  // --- STATE MANAGEMENT ---
+  
+  // 1. Academic Tasks
   const [tasks, setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem('camilo_tasks');
     return saved ? JSON.parse(saved) : INITIAL_TASKS;
+  });
+
+  // 2. Mentoring Topics
+  const [mentoringTopics, setMentoringTopics] = useState<MentoringTopic[]>(() => {
+    const saved = localStorage.getItem('camilo_mentoring');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // 3. Personal Tasks
+  const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>(() => {
+    const saved = localStorage.getItem('camilo_personal');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // 4. History Log (The Source of Truth for Summary)
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    const saved = localStorage.getItem('camilo_history');
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [aiLoading, setAiLoading] = useState(false);
@@ -31,9 +52,11 @@ const App: React.FC = () => {
   
   const [scrolled, setScrolled] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem('camilo_tasks', JSON.stringify(tasks));
-  }, [tasks]);
+  // --- PERSISTENCE ---
+  useEffect(() => localStorage.setItem('camilo_tasks', JSON.stringify(tasks)), [tasks]);
+  useEffect(() => localStorage.setItem('camilo_mentoring', JSON.stringify(mentoringTopics)), [mentoringTopics]);
+  useEffect(() => localStorage.setItem('camilo_personal', JSON.stringify(personalTasks)), [personalTasks]);
+  useEffect(() => localStorage.setItem('camilo_history', JSON.stringify(history)), [history]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -55,7 +78,17 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle Structured Input from the new InputBar
+  // --- ACTIONS ---
+
+  const addToHistory = (item: Omit<HistoryItem, 'completedAt'>) => {
+    const entry: HistoryItem = {
+      ...item,
+      completedAt: new Date().toISOString()
+    };
+    setHistory(prev => [entry, ...prev]);
+  };
+
+  // ACADEMIC HANDLERS
   const handleInputPayload = async (payload: InputPayload) => {
     setAiLoading(true);
     setLastMessage(null);
@@ -77,13 +110,11 @@ const App: React.FC = () => {
         setAiLoading(false);
       } 
       else if (payload.type === 'MEETING') {
-        // For now, we add meetings as tasks with specific formatting, or could be a separate event state
-        // Let's treat it as a "Personal" task with specific time in title for simplicity in this demo
         const newEvent: Task = {
           id: Date.now().toString(),
           title: `Reunión: ${payload.data.title} (${payload.data.time})`,
           type: TaskType.PERSONAL,
-          priority: Priority.HIGH, // Meetings usually high priority
+          priority: Priority.HIGH,
           dueDate: `${payload.data.date}T${payload.data.time}:00`,
           completed: false
         };
@@ -91,11 +122,56 @@ const App: React.FC = () => {
         setLastMessage("Reunión agendada.");
         setAiLoading(false);
       }
+      else if (payload.type === 'MENTORING_ENTRY') {
+          // New strict mentoring handling
+          const { mentoringType, title, date, time } = payload.data;
+          
+          let prefix = '';
+          switch(mentoringType) {
+              case 'TOPIC': prefix = 'Monitoría (Tema):'; break;
+              case 'DATE': prefix = 'Sesión Monitoría:'; break;
+              case 'WORKSHOP': prefix = 'Monitoría (Taller):'; break;
+          }
+
+          const fullTitle = `${prefix} ${title}`;
+          const dueDateTime = `${date}T${time}:00`;
+
+          // 1. Add to Main Task List (Timeline View)
+          const newMentoringTask: Task = {
+              id: Date.now().toString(),
+              title: fullTitle,
+              type: TaskType.MONITOR,
+              priority: Priority.HIGH,
+              dueDate: dueDateTime,
+              completed: false,
+              description: title // Raw content
+          };
+          
+          setTasks(prev => [...prev, newMentoringTask]);
+
+          // 2. Sync to Panel if it is a Topic
+          if (mentoringType === 'TOPIC' && title) {
+              addMentoringTopic(title);
+          }
+
+          setLastMessage(`Registro de ${mentoringType === 'WORKSHOP' ? 'Taller' : 'Monitoría'} guardado exitosamente.`);
+          setAiLoading(false);
+      }
       else if (payload.type === 'QUESTION' && payload.data.question) {
-        // Use Gemini for questions
         const result = await parseUserInput(payload.data.question);
+        
         if (result) {
-           setLastMessage(result.responseMessage);
+           // Handle Mentoring Specific Actions
+           if (result.intent === 'ADD_MENTORING_TOPIC' && result.mentoringData?.topic) {
+               addMentoringTopic(result.mentoringData.topic);
+           }
+           
+           if (result.intent === 'GENERATE_WORKSHOP' && result.mentoringData?.workshopContent) {
+               // The content is displayed in the message box
+               setLastMessage(`${result.responseMessage}\n\n${result.mentoringData.workshopContent}`);
+           } else {
+               setLastMessage(result.responseMessage);
+           }
         }
         setAiLoading(false);
       }
@@ -103,6 +179,75 @@ const App: React.FC = () => {
       console.error(error);
       setLastMessage("Hubo un error al procesar tu solicitud.");
       setAiLoading(false);
+    }
+  };
+
+  const toggleTask = (id: string) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id === id) {
+        const isCompleting = !t.completed;
+        if (isCompleting) {
+          addToHistory({ id: t.id, title: t.title, category: t.type === TaskType.MONITOR ? 'MENTORING' : 'ACADEMIC', details: t.subject });
+        }
+        return { ...t, completed: isCompleting };
+      }
+      return t;
+    }));
+  };
+
+  // MENTORING HANDLERS
+  const addMentoringTopic = (title: string) => {
+    // Check for duplicates to avoid adding same topic twice if added via Form
+    setMentoringTopics(prev => {
+        if (prev.some(t => t.title === title)) return prev;
+        return [...prev, {
+            id: Date.now().toString(),
+            title,
+            status: 'IN_PROGRESS',
+            students: 'Por asignar'
+        }];
+    });
+  };
+
+  const cycleMentoringStatus = (id: string) => {
+    setMentoringTopics(prev => prev.map(t => {
+      if (t.id !== id) return t;
+      
+      const map: Record<string, 'PREPARED' | 'IN_PROGRESS' | 'COMPLETED'> = {
+        'PREPARED': 'IN_PROGRESS',
+        'IN_PROGRESS': 'COMPLETED',
+        'COMPLETED': 'PREPARED'
+      };
+      
+      const nextStatus = map[t.status];
+      
+      if (nextStatus === 'COMPLETED') {
+        addToHistory({ id: t.id, title: t.title, category: 'MENTORING', details: 'Tema finalizado' });
+      }
+      
+      return { ...t, status: nextStatus };
+    }));
+  };
+
+  // PERSONAL HANDLERS
+  const addPersonalTask = (title: string, category: PersonalCategory, priority: string) => {
+     setPersonalTasks(prev => [{
+       id: Date.now().toString(),
+       title,
+       category,
+       priority: priority as Priority,
+       completed: false,
+       date: 'Hoy'
+     }, ...prev]);
+  };
+
+  const completePersonalTask = (id: string) => {
+    const task = personalTasks.find(t => t.id === id);
+    if (task) {
+      // Add to history BEFORE removing
+      addToHistory({ id: task.id, title: task.title, category: 'PERSONAL', details: task.category });
+      // Remove from UI
+      setPersonalTasks(prev => prev.filter(t => t.id !== id));
     }
   };
   
@@ -116,7 +261,6 @@ const App: React.FC = () => {
          message = "Tus espacios asignados para Monitoría de Estadística son: Jueves de 14:00 a 16:00.";
      } 
      else if (actionType === 'TOMORROW_CLASSES') {
-         // Calculate tomorrow's day index (0-6)
          const tomorrow = (new Date().getDay() + 1) % 7;
          const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
          const dayName = days[tomorrow];
@@ -134,22 +278,17 @@ const App: React.FC = () => {
      } 
      else if (actionType === 'SUMMARY') {
          const pending = tasks.filter(t => !t.completed);
-         if (pending.length === 0) {
+         const personalPending = personalTasks.length;
+         
+         if (pending.length === 0 && personalPending === 0) {
              message = "¡Todo despejado! No tienes tareas pendientes actualmente.";
          } else {
-             const high = pending.filter(t => t.priority === Priority.HIGH).length;
-             const med = pending.filter(t => t.priority === Priority.MEDIUM).length;
-             const low = pending.filter(t => t.priority === Priority.LOW).length;
-             message = `Resumen de pendientes: ${pending.length} en total. (${high} Alta, ${med} Media, ${low} Baja).`;
+             message = `Resumen de pendientes: ${pending.length} académicas y ${personalPending} personales.`;
          }
      }
 
      setLastMessage(message);
      setAiLoading(false);
-  };
-
-  const toggleTask = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
   };
 
   // Derived State
@@ -168,10 +307,10 @@ const App: React.FC = () => {
         else if (subFilter === Priority.MEDIUM) filtered = filtered.filter(t => t.priority === Priority.MEDIUM);
         else if (subFilter === Priority.LOW) filtered = filtered.filter(t => t.priority === Priority.LOW);
         
-        // Sort by priority always
         return filtered.sort((a, b) => {
             const pMap = { [Priority.HIGH]: 3, [Priority.MEDIUM]: 2, [Priority.LOW]: 1 };
-            return pMap[b.priority] - pMap[a.priority];
+            // Sort by date then priority
+            return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
         });
     }
     
@@ -192,7 +331,6 @@ const App: React.FC = () => {
     return days[todayDayOfWeek];
   }
 
-  // Handle Tab Switch (reset subfilters)
   const switchTab = (tab: 'PRIORITY' | 'SUBJECT' | 'CALENDAR') => {
       setActiveTab(tab);
       setSubFilter(null);
@@ -227,13 +365,13 @@ const App: React.FC = () => {
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <SummaryWidget 
             suggestion={suggestion} 
-            taskCount={pendingTasks.length} 
+            taskCount={pendingTasks.length + personalTasks.length} 
             classesToday={classesToday.length}
           />
         </section>
 
-        {/* Weekly Summary Panel */}
-        <WeeklySummaryPanel />
+        {/* Weekly Summary Panel - PASSING HISTORY */}
+        <WeeklySummaryPanel history={history} />
 
         {/* AI Response Message Area */}
         {lastMessage && (
@@ -241,7 +379,7 @@ const App: React.FC = () => {
             <div className="bg-violet-100 p-2 rounded-full shrink-0">
               <MessageSquare className="w-5 h-5 text-violet-600" />
             </div>
-            <p className="text-sm font-medium pt-1">{lastMessage}</p>
+            <p className="text-sm font-medium pt-1 whitespace-pre-line">{lastMessage}</p>
           </div>
         )}
 
@@ -412,11 +550,19 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            {/* Mentoring Panel */}
-            <MentoringPanel />
+            {/* Mentoring Panel - Using Props */}
+            <MentoringPanel 
+              topics={mentoringTopics}
+              onAdd={addMentoringTopic}
+              onCycleStatus={cycleMentoringStatus}
+            />
 
-            {/* Personal Tasks Panel */}
-            <PersonalTasksPanel />
+            {/* Personal Tasks Panel - Using Props */}
+            <PersonalTasksPanel 
+              tasks={personalTasks}
+              onAdd={addPersonalTask}
+              onComplete={completePersonalTask}
+            />
 
           </div>
         </div>
